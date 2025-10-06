@@ -2,7 +2,7 @@
 *.csv
 
 # Saved models and features
-*.pkl
+#*.pkl
 
 # macOS system files
 .DS_Store
