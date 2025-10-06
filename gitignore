@@ -1,0 +1,14 @@
+# Datasets
+*.csv
+
+# Saved models and features
+*.pkl
+
+# macOS system files
+.DS_Store
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Python virtual environment
+venv/
