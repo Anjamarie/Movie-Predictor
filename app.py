@@ -2,57 +2,67 @@ import streamlit as st
 import pandas as pd
 import joblib
 from huggingface_hub import hf_hub_download
-# Import the specific error classes for clearer debugging
 from huggingface_hub.utils import RepositoryNotFoundError, EntryNotFoundError, HfHubDownloadError
 
 # -----------------------------------------------
-# 1. CRITICAL CONFIGURATION: Lowercase for Reliability
+# 1. CRITICAL CONFIGURATION: Using Direct Public CDN URLs (Last Resort)
 # -----------------------------------------------
-# NOTE: Using all lowercase is the standard fix for Hugging Face casing issues 
-# when the repository is public but throws a permission/404 error.
-HF_REPO_ID = "anjamarie/movie-predictor"  # CHANGED to all lowercase for reliability
+# NOTE: This uses the direct CDN link structure which often bypasses proxy/firewall issues 
+# that affect the standard hf_hub_download API, assuming the files are public.
+HF_REPO_ID = "anjamarie/movie-predictor"  # Still used in error messages for context
 MODEL_REVENUE_FILE = "movie_revenue_model.pkl" 
 MODEL_FEATURES_FILE = "model_features.pkl" 
+
+BASE_CDN_URL = f"https://cdn-lfs.huggingface.co/{HF_REPO_ID}/{MODEL_FEATURES_FILE}"
+MODEL_FEATURES_CDN_URL = f"https://cdn-lfs.huggingface.co/{HF_REPO_ID}/resolve/main/{MODEL_FEATURES_FILE}"
+MODEL_REVENUE_CDN_URL = f"https://cdn-lfs.huggingface.co/{HF_REPO_ID}/resolve/main/{MODEL_REVENUE_FILE}"
+
+# Define local paths (used by joblib)
+MODEL_FEATURES_PATH = "model_features.pkl"
+MODEL_REVENUE_PATH = "movie_revenue_model.pkl"
 # -----------------------------------------------
 
 @st.cache_resource
-def download_and_load_model_hf(file_name, repo_id):
+def download_and_load_model_hf(file_name, cdn_url, local_path):
     """
-    Uses huggingface_hub to download the file into the local cache and loads it.
-    Includes robust error logging for specific Hugging Face failure modes.
+    Uses the direct CDN URL to download the file using requests, 
+    which is necessary when hf_hub_download fails due to firewall issues.
     """
-    st.info(f"Attempting to load '{file_name}' from repository: {repo_id}")
+    st.info(f"Attempting to download '{file_name}' directly from CDN: {cdn_url}")
     
-    try:
-        # Download the file. This handles caching and redirects internally.
-        cache_path = hf_hub_download(repo_id=repo_id, filename=file_name, revision="main")
-        
-        st.success(f"'{file_name}' downloaded successfully. Loading model...")
-        
-        # Load the model using joblib from the cached path
-        loaded_object = joblib.load(cache_path)
-        return loaded_object
-        
-    except RepositoryNotFoundError:
-        st.error(f"FATAL ERROR (404/Repo Not Found): Repository '{repo_id}' does not exist.")
-        st.error("Action: Verify the casing of your username and repository name on Hugging Face.")
-    
-    except EntryNotFoundError:
-        st.error(f"FATAL ERROR (404/File Not Found): File '{file_name}' is missing in repo '{repo_id}'.")
-        st.error("Action: Verify the file name casing and ensure the file was uploaded successfully.")
-        
-    except HfHubDownloadError as e:
-        # Catch network-level errors, including 403 Forbidden
-        st.error(f"FATAL ERROR (Download Failed): Network error during file transfer.")
-        st.error(f"Hugging Face Hub Error: {e}")
-        st.warning("Action: Ensure the Hugging Face repo is set to **Public** (not gated or private).")
+    if os.path.exists(local_path):
+        st.success(f"'{local_path}' found in cache.")
+    else:
+        try:
+            with st.spinner(f'Downloading large file: {file_name} from Hugging Face CDN...'):
+                import requests
+                response = requests.get(cdn_url, stream=True)
+                response.raise_for_status() # Raise exception for 4xx or 5xx errors
 
+                with open(local_path, 'wb') as file:
+                    file.write(response.content)
+                
+                st.success(f"'{file_name}' download complete via direct CDN link!")
+            
+        except requests.exceptions.HTTPError as e:
+            st.error(f"FATAL ERROR (HTTP {e.response.status_code}): Download failed.")
+            st.error(f"Action: Check Hugging Face repo '{HF_REPO_ID}' file casing and Public status.")
+            st.warning(f"Error details: {e}")
+            return None 
+
+        except Exception as e:
+            st.error(f"FATAL ERROR (Unknown Download Error): {type(e).__name__}: {e}")
+            return None
+
+    # Load the object using joblib
+    try:
+        loaded_object = joblib.load(local_path)
+        st.success(f"'{file_name}' loaded successfully.")
+        return loaded_object
     except Exception as e:
-        # Catch other errors, like corrupted file or joblib failure
-        st.error(f"FATAL ERROR (Loading/Other): An unknown error occurred while loading '{file_name}'.")
+        st.error(f"FATAL ERROR (Loading/Corrupted): Failed to load '{local_path}'. Is the file corrupted?")
         st.error(f"Reason: {type(e).__name__}: {e}")
-    
-    return None # Return None if any error occurred
+        return None 
 
 
 # -----------------------------------------------
@@ -60,10 +70,10 @@ def download_and_load_model_hf(file_name, repo_id):
 # -----------------------------------------------
 
 # Load the features file first
-model_features = download_and_load_model_hf(MODEL_FEATURES_FILE, HF_REPO_ID)
+model_features = download_and_load_model_hf(MODEL_FEATURES_FILE, MODEL_FEATURES_CDN_URL, MODEL_FEATURES_PATH)
 
 # Load the trained model
-model = download_and_load_model_hf(MODEL_REVENUE_FILE, HF_REPO_ID)
+model = download_and_load_model_hf(MODEL_REVENUE_FILE, MODEL_REVENUE_CDN_URL, MODEL_REVENUE_PATH)
 
 
 # --- 3. Run App Logic Only if Both Models Loaded Successfully ---
@@ -117,6 +127,4 @@ if st.sidebar.button('Predict Revenue'):
     prediction = model.predict(input_df)
     st.subheader('Predicted Revenue:')
     st.success(f'${prediction[0]:,.2f}')
-
-
 
