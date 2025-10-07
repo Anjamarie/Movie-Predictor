@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import joblib
 from huggingface_hub import hf_hub_download
-from huggingface_hub.utils import RepositoryNotFoundError, EntryNotFoundError
+# Import the specific error classes for clearer debugging
+from huggingface_hub.utils import RepositoryNotFoundError, EntryNotFoundError, HfHubDownloadError
 
 # -----------------------------------------------
 # 1. CRITICAL CONFIGURATION: CHECK CASE SENSITIVITY
@@ -17,11 +18,12 @@ MODEL_FEATURES_FILE = "model_features.pkl"
 def download_and_load_model_hf(file_name, repo_id):
     """
     Uses huggingface_hub to download the file into the local cache and loads it.
+    Includes robust error logging for specific Hugging Face failure modes.
     """
     st.info(f"Attempting to load '{file_name}' from repository: {repo_id}")
     
     try:
-        # Download the file. If successful, this returns the path in the local cache.
+        # Download the file. This handles caching and redirects internally.
         cache_path = hf_hub_download(repo_id=repo_id, filename=file_name, revision="main")
         
         st.success(f"'{file_name}' downloaded successfully. Loading model...")
@@ -31,13 +33,23 @@ def download_and_load_model_hf(file_name, repo_id):
         return loaded_object
         
     except RepositoryNotFoundError:
-        st.error(f"FATAL ERROR: Repository '{repo_id}' not found. Please verify the casing of your username and repository name on Hugging Face.")
+        st.error(f"FATAL ERROR (404/Repo Not Found): Repository '{repo_id}' does not exist.")
+        st.error("Action: Verify the casing of your username and repository name on Hugging Face.")
+    
     except EntryNotFoundError:
-        st.error(f"FATAL ERROR: File '{file_name}' not found in repo '{repo_id}'. Please verify the file name casing.")
+        st.error(f"FATAL ERROR (404/File Not Found): File '{file_name}' is missing in repo '{repo_id}'.")
+        st.error("Action: Verify the file name casing and ensure the file was uploaded successfully.")
+        
+    except HfHubDownloadError as e:
+        # Catch network-level errors, including 403 Forbidden
+        st.error(f"FATAL ERROR (Download Failed): Network error during file transfer.")
+        st.error(f"Hugging Face Hub Error: {e}")
+        st.warning("Action: Ensure the Hugging Face repo is set to **Public** (not gated or private).")
+
     except Exception as e:
-        # Catch other errors, like network failure or corrupted file
-        st.error(f"FATAL ERROR: Unknown error during download/load of '{file_name}'. Reason: {type(e).__name__}: {e}")
-        st.warning("Ensure the Hugging Face repo is set to **Public**.")
+        # Catch other errors, like corrupted file or joblib failure
+        st.error(f"FATAL ERROR (Loading/Other): An unknown error occurred while loading '{file_name}'.")
+        st.error(f"Reason: {type(e).__name__}: {e}")
     
     return None # Return None if any error occurred
 
