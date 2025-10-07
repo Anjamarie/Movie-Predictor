@@ -8,6 +8,8 @@ import joblib
 # -----------------------------------------------
 # 1. MODEL CONFIGURATION & DOWNLOAD SETUP (HUGGING FACE)
 # -----------------------------------------------
+
+# The app is currently using these URLs:
 MODEL_REVENUE_URL = "https://huggingface.co/Anjamarie/Movie-Predictor/resolve/main/movie_revenue_model.pkl" 
 MODEL_FEATURES_URL = "https://huggingface.co/Anjamarie/Movie-Predictor/resolve/main/model_features.pkl" 
 
@@ -22,7 +24,12 @@ def download_and_load_model(download_url, local_path):
     provided URL (Hugging Face) and then loads it using joblib.
     """
 
-    # Check if the file already exists locally
+    # --- DEBUGGING STEP ADDED ---
+    # Display the URL so the user can check capitalization and path
+    st.info(f"Checking URL for {local_path}: {download_url}")
+    # ----------------------------
+
+    # Check if the file already exists locally (useful for Streamlit Cloud caching)
     if not os.path.exists(local_path):
         st.info(f"Model file '{local_path}' not found. Attempting download from Hugging Face...")
         
@@ -30,17 +37,19 @@ def download_and_load_model(download_url, local_path):
             with st.spinner(f'Downloading large file: {local_path}...'):
                 # Use requests to perform the file download
                 response = requests.get(download_url, stream=True)
-                response.raise_for_status()
+                response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
 
+                # Write the downloaded content to the local file path
                 with open(local_path, 'wb') as file:
                     file.write(response.content)
             
-            st.success(f"'{local_path}' download complete!")
+            st.success(f"'{local_path}' download complete! The app should now run.")
             
         except requests.exceptions.RequestException as e:
+            # Enhanced error message for Hugging Face failure troubleshooting
             st.error(f"FATAL ERROR: Failed to download model file '{local_path}'.")
             st.error(f"Reason: {e}")
-            st.warning("Possible Issues: 1. Hugging Face URL is wrong. 2. Hugging Face repo is not Public.")
+            st.warning("POSSIBLE FIX: Check that the URL above matches the case (upper/lower letters) on Hugging Face exactly.")
             return None # Return None if download fails
 
     # Load the model using joblib
@@ -66,7 +75,7 @@ model = download_and_load_model(MODEL_REVENUE_URL, MODEL_REVENUE_PATH)
 # --- 3. Run App Logic Only if Both Models Loaded Successfully ---
 
 if model is None or model_features is None:
-    st.stop() 
+    st.stop() # Stop the app if model loading failed (error message already displayed)
 
 # --- 4. Build the User Interface ---
 st.title('🎬 Movie Revenue Predictor')
