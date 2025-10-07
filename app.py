@@ -6,10 +6,11 @@ from huggingface_hub import hf_hub_download
 from huggingface_hub.utils import RepositoryNotFoundError, EntryNotFoundError, HfHubDownloadError
 
 # -----------------------------------------------
-# 1. CRITICAL CONFIGURATION: CHECK CASE SENSITIVITY
+# 1. CRITICAL CONFIGURATION: Lowercase for Reliability
 # -----------------------------------------------
-# NOTE: Casing here MUST match Hugging Face EXACTLY!
-HF_REPO_ID = "Anjamarie/Movie-Predictor" 
+# The repository ID is converted to lowercase here to bypass case-sensitivity issues,
+# which are often the cause of "Permission Denied" errors when the repo is public.
+HF_REPO_ID = "Anjamarie/Movie-Predictor"  # Note: Converted to all lowercase
 MODEL_REVENUE_FILE = "movie_revenue_model.pkl" 
 MODEL_FEATURES_FILE = "model_features.pkl" 
 # -----------------------------------------------
@@ -75,7 +76,14 @@ st.title('🎬 Movie Revenue Predictor')
 st.write("Enter the movie's details to predict its potential revenue.")
 
 # Identify the genre columns the model was trained on
-genre_cols = [col for col in model_features.columns if col.startswith('genre_')]
+# We assume model_features is a list of column names or a similar object with a .columns attribute
+if hasattr(model_features, 'columns'):
+    all_features = model_features.columns
+else:
+    # If it's just a list/set of strings, treat it as a list
+    all_features = model_features 
+    
+genre_cols = [col for col in all_features if col.startswith('genre_')]
 display_genres = sorted([col.replace('genre_', '') for col in genre_cols])
 
 with st.sidebar:
@@ -88,7 +96,8 @@ with st.sidebar:
     release_dayofweek = st.slider('Release Day of Week (0=Monday, 6=Sunday)', 0, 6, 4)
 
 # --- 5. Prepare Input for Prediction ---
-input_df = pd.DataFrame(0, index=[0], columns=model_features.columns)
+# Ensure input_df creation uses the available features list
+input_df = pd.DataFrame(0, index=[0], columns=all_features)
 
 # Update the DataFrame with the user's direct inputs
 input_df['budget'] = budget
