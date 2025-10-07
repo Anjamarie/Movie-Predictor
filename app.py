@@ -3,12 +3,9 @@ import pandas as pd
 import joblib
 
 # --- 1. Load the Saved Model and Features ---
-try:
-    model = joblib.load('movie_revenue_model.pkl')
-    model_features = joblib.load('model_features.pkl')
-except FileNotFoundError:
-    st.error("Model or features not found. Please re-run your training notebook to save them.")
-    st.stop()
+
+model = joblib.load('movie_revenue_model.pkl')
+model_features = joblib.load('model_features.pkl')
 
 # --- 2. Build the User Interface ---
 st.title('🎬 Movie Revenue Predictor')
