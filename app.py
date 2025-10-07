@@ -1,88 +1,68 @@
 import streamlit as st
-import pickle
-import requests
-import os
 import pandas as pd
 import joblib
+from huggingface_hub import hf_hub_download
+from huggingface_hub.utils import RepositoryNotFoundError, EntryNotFoundError
 
 # -----------------------------------------------
-# 1. MODEL CONFIGURATION & DOWNLOAD SETUP (HUGGING FACE)
+# 1. CRITICAL CONFIGURATION: CHECK CASE SENSITIVITY
 # -----------------------------------------------
-
-# The app is currently using these URLs:
-MODEL_REVENUE_URL = "https://huggingface.co/Anjamarie/Movie-Predictor/resolve/main/movie_revenue_model.pkl" 
-MODEL_FEATURES_URL = "https://huggingface.co/Anjamarie/Movie-Predictor/resolve/main/model_features.pkl" 
-
-# Define the local file names for saving
-MODEL_FEATURES_PATH = "model_features.pkl"
-MODEL_REVENUE_PATH = "movie_revenue_model.pkl"
+# NOTE: Casing here MUST match Hugging Face EXACTLY!
+HF_REPO_ID = "Anjamarie/Movie-Predictor" 
+MODEL_REVENUE_FILE = "movie_revenue_model.pkl" 
+MODEL_FEATURES_FILE = "model_features.pkl" 
+# -----------------------------------------------
 
 @st.cache_resource
-def download_and_load_model(download_url, local_path):
+def download_and_load_model_hf(file_name, repo_id):
     """
-    Checks if the model file exists locally. If not, downloads it from the
-    provided URL (Hugging Face) and then loads it using joblib.
+    Uses huggingface_hub to download the file into the local cache and loads it.
     """
-
-    # --- DEBUGGING STEP ADDED ---
-    # Display the URL so the user can check capitalization and path
-    st.info(f"Checking URL for {local_path}: {download_url}")
-    # ----------------------------
-
-    # Check if the file already exists locally (useful for Streamlit Cloud caching)
-    if not os.path.exists(local_path):
-        st.info(f"Model file '{local_path}' not found. Attempting download from Hugging Face...")
-        
-        try:
-            with st.spinner(f'Downloading large file: {local_path}...'):
-                # Use requests to perform the file download
-                response = requests.get(download_url, stream=True)
-                response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
-
-                # Write the downloaded content to the local file path
-                with open(local_path, 'wb') as file:
-                    file.write(response.content)
-            
-            st.success(f"'{local_path}' download complete! The app should now run.")
-            
-        except requests.exceptions.RequestException as e:
-            # Enhanced error message for Hugging Face failure troubleshooting
-            st.error(f"FATAL ERROR: Failed to download model file '{local_path}'.")
-            st.error(f"Reason: {e}")
-            st.warning("POSSIBLE FIX: Check that the URL above matches the case (upper/lower letters) on Hugging Face exactly.")
-            return None # Return None if download fails
-
-    # Load the model using joblib
+    st.info(f"Attempting to load '{file_name}' from repository: {repo_id}")
+    
     try:
-        loaded_object = joblib.load(local_path)
+        # Download the file. If successful, this returns the path in the local cache.
+        cache_path = hf_hub_download(repo_id=repo_id, filename=file_name, revision="main")
+        
+        st.success(f"'{file_name}' downloaded successfully. Loading model...")
+        
+        # Load the model using joblib from the cached path
+        loaded_object = joblib.load(cache_path)
         return loaded_object
+        
+    except RepositoryNotFoundError:
+        st.error(f"FATAL ERROR: Repository '{repo_id}' not found. Please verify the casing of your username and repository name on Hugging Face.")
+    except EntryNotFoundError:
+        st.error(f"FATAL ERROR: File '{file_name}' not found in repo '{repo_id}'. Please verify the file name casing.")
     except Exception as e:
-        st.error(f"FATAL ERROR: Failed to load '{local_path}' using joblib. Is the file corrupted or loaded incorrectly? Error: {e}")
-        return None
+        # Catch other errors, like network failure or corrupted file
+        st.error(f"FATAL ERROR: Unknown error during download/load of '{file_name}'. Reason: {type(e).__name__}: {e}")
+        st.warning("Ensure the Hugging Face repo is set to **Public**.")
+    
+    return None # Return None if any error occurred
 
 
 # -----------------------------------------------
-# 2. Load the Saved Model and Features (Using the new function)
+# 2. Load the Saved Model and Features 
 # -----------------------------------------------
 
 # Load the features file first
-model_features = download_and_load_model(MODEL_FEATURES_URL, MODEL_FEATURES_PATH)
+model_features = download_and_load_model_hf(MODEL_FEATURES_FILE, HF_REPO_ID)
 
 # Load the trained model
-model = download_and_load_model(MODEL_REVENUE_URL, MODEL_REVENUE_PATH)
+model = download_and_load_model_hf(MODEL_REVENUE_FILE, HF_REPO_ID)
 
 
 # --- 3. Run App Logic Only if Both Models Loaded Successfully ---
 
 if model is None or model_features is None:
-    st.stop() # Stop the app if model loading failed (error message already displayed)
+    st.stop() 
 
 # --- 4. Build the User Interface ---
 st.title('🎬 Movie Revenue Predictor')
 st.write("Enter the movie's details to predict its potential revenue.")
 
 # Identify the genre columns the model was trained on
-# The model_features object loaded from the PKL file is assumed to be a DataFrame
 genre_cols = [col for col in model_features.columns if col.startswith('genre_')]
 display_genres = sorted([col.replace('genre_', '') for col in genre_cols])
 
@@ -96,7 +76,6 @@ with st.sidebar:
     release_dayofweek = st.slider('Release Day of Week (0=Monday, 6=Sunday)', 0, 6, 4)
 
 # --- 5. Prepare Input for Prediction ---
-# Create a DataFrame with all feature columns initialized to 0
 input_df = pd.DataFrame(0, index=[0], columns=model_features.columns)
 
 # Update the DataFrame with the user's direct inputs
