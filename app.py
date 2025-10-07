@@ -8,9 +8,9 @@ from huggingface_hub.utils import RepositoryNotFoundError, EntryNotFoundError, H
 # -----------------------------------------------
 # 1. CRITICAL CONFIGURATION: Lowercase for Reliability
 # -----------------------------------------------
-# The repository ID is converted to lowercase here to bypass case-sensitivity issues,
-# which are often the cause of "Permission Denied" errors when the repo is public.
-HF_REPO_ID = "Anjamarie/Movie-Predictor"  # Note: Converted to all lowercase
+# NOTE: Using all lowercase is the standard fix for Hugging Face casing issues 
+# when the repository is public but throws a permission/404 error.
+HF_REPO_ID = "anjamarie/movie-predictor"  # CHANGED to all lowercase for reliability
 MODEL_REVENUE_FILE = "movie_revenue_model.pkl" 
 MODEL_FEATURES_FILE = "model_features.pkl" 
 # -----------------------------------------------
