@@ -1,21 +1,19 @@
 import streamlit as st
 import pandas as pd
 import joblib
-from huggingface_hub import hf_hub_download
-from huggingface_hub.utils import RepositoryNotFoundError, EntryNotFoundError, HfHubDownloadError
 import requests
 import os
+from huggingface_hub.utils import RepositoryNotFoundError, EntryNotFoundError, HfHubDownloadError
 
 # -----------------------------------------------
-# 1. CRITICAL CONFIGURATION: Using standard Hugging Face resolve URL (Final Attempt)
+# 1. CRITICAL CONFIGURATION: Using standard Hugging Face resolve URL 
 # -----------------------------------------------
-# NOTE: This uses the standard resolve URL which sometimes bypasses proxy issues 
-# that block the dedicated cdn-lfs.huggingface.co domain.
+# NOTE: The lowercase repo ID 'anjamarie/movie-predictor' is used for best compatibility.
 HF_REPO_ID = "anjamarie/movie-predictor"
 MODEL_REVENUE_FILE = "movie_revenue_model.pkl" 
 MODEL_FEATURES_FILE = "model_features.pkl" 
 
-# Defining the new standard resolve URLs
+# Defining the standard resolve URLs
 BASE_HF_URL = "https://huggingface.co"
 MODEL_FEATURES_CDN_URL = f"{BASE_HF_URL}/{HF_REPO_ID}/resolve/main/{MODEL_FEATURES_FILE}"
 MODEL_REVENUE_CDN_URL = f"{BASE_HF_URL}/{HF_REPO_ID}/resolve/main/{MODEL_REVENUE_FILE}"
@@ -28,7 +26,8 @@ MODEL_REVENUE_PATH = "movie_revenue_model.pkl"
 @st.cache_resource
 def download_and_load_model_hf(file_name, cdn_url, local_path):
     """
-    Uses the direct URL to download the file using requests.
+    Uses the direct URL to download the file using requests with a timeout, 
+    which is essential for diagnosing persistent network/proxy blocks.
     """
     st.info(f"Attempting to download '{file_name}' from: {cdn_url}")
     
@@ -37,7 +36,8 @@ def download_and_load_model_hf(file_name, cdn_url, local_path):
     else:
         try:
             with st.spinner(f'Downloading large file: {file_name}...'):
-                response = requests.get(cdn_url, stream=True)
+                # Added timeout=10 to prevent logs from stalling on network hang
+                response = requests.get(cdn_url, stream=True, timeout=10) 
                 response.raise_for_status() # Raise exception for 4xx or 5xx errors
 
                 with open(local_path, 'wb') as file:
@@ -46,12 +46,20 @@ def download_and_load_model_hf(file_name, cdn_url, local_path):
                 st.success(f"'{file_name}' download complete via standard link!")
             
         except requests.exceptions.HTTPError as e:
+            # Captures 403 Forbidden or 404 Not Found errors clearly
             st.error(f"FATAL ERROR (HTTP {e.response.status_code}): Download failed.")
             st.error(f"Action: Check Hugging Face repo '{HF_REPO_ID}' file casing and Public status.")
             st.warning(f"Error details: {e}")
             return None 
+            
+        except requests.exceptions.Timeout:
+            # Captures network stalls (proxy/firewall block)
+            st.error("FATAL ERROR (Network Timeout): Download stalled for 10 seconds.")
+            st.warning("Action: This indicates a strict network block on the Streamlit server.")
+            return None
 
         except Exception as e:
+            # Catches any other error during download
             st.error(f"FATAL ERROR (Unknown Download Error): {type(e).__name__}: {e}")
             return None
 
@@ -61,6 +69,7 @@ def download_and_load_model_hf(file_name, cdn_url, local_path):
         st.success(f"'{file_name}' loaded successfully.")
         return loaded_object
     except Exception as e:
+        # Catches corruption/bad file format after download
         st.error(f"FATAL ERROR (Loading/Corrupted): Failed to load '{local_path}'. Is the file corrupted?")
         st.error(f"Reason: {type(e).__name__}: {e}")
         return None 
@@ -133,8 +142,10 @@ for genre in selected_genres:
 
 # --- 6. Make a Prediction ---
 if st.sidebar.button('Predict Revenue'):
-    prediction = model.predict(input_df)
-    st.subheader('Predicted Revenue:')
-    st.success(f'${prediction[0]:,.2f}')
-
-
+    # Ensure the model variable exists before predicting
+    if model is not None:
+        prediction = model.predict(input_df)
+        st.subheader('Predicted Revenue:')
+        st.success(f'${prediction[0]:,.2f}')
+    else:
+        st.warning("Model not available for prediction.")
