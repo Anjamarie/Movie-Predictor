@@ -5,7 +5,7 @@ This project implements a machine learning pipeline to predict a movie's potenti
 
 Crucially, this repository serves as a case study in robust data science deployment, demonstrating solutions to common pitfalls encountered when deploying large model files on platforms like Streamlit Cloud.
 
-### View the Live Application: https://movie-predictor.streamlit.app (not yet functional)
+### View the Live Application: (https://anjamarie-movie-predictor.hf.space/)
 
 ## Prediction Features
 The model uses the following eight key features, derived from TMDb data, to make predictions:
