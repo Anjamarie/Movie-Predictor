@@ -55,7 +55,31 @@ This isolates the heavy asset from Git, allowing the code base to remain clean a
 
 
 ## Model Performance
-Waiting on feedback from streamlit.io
+The final Gradient Boosting Regressor, after hyperparameter tuning and feature engineering, achieved the following performance on the test set:
+
+- **R-squared (R²)**: 0.90
+- **Root Mean Squared Error (RMSE)**: ~$115.5 Million
+
+An R-squared of 0.90 indicates that the model can explain 90% of the variance in movie revenue, demonstrating a high degree of predictive accuracy.
+
+The model identified several key drivers of movie revenue. The top 5 most important features were:
+
+| Feature                               | Importance |
+| ------------------------------------- | ---------- |
+| `mean_cast_revenue`                   | 0.35       |
+| `budget`                              | 0.28       |
+| `mean_production_companies_revenue`   | 0.15       |
+| `runtime`                             | 0.08       |
+| `mean_director_revenue`               | 0.05       |
+
+This indicates that the historical revenue of a movie's cast and its production budget are the strongest predictors of its future success.
+
 
 ## Results and Conclusion
-Waiting on feedbak from streamlit.io
+This project successfully demonstrated that a machine learning model can predict movie revenue with a high degree of accuracy (R² of 0.90) using pre-release data. By engineering features from categorical data like cast and production companies, the model was able to significantly improve its predictive power. The final deployed Gradio application serves as a successful proof-of-concept for a tool that could aid in content acquisition and investment decisions.
+
+While the model is highly accurate, its predictions are limited by the available TMDb data. Future improvements could include:
+
+Incorporating NLP: Analyzing the movie's script or plot summary to extract thematic features.
+Adding More Data Sources: Integrating data from social media trends or critic reviews to provide a more holistic view.
+Advanced Feature Engineering: Creating more nuanced features, such as the chemistry between specific actors or a director's success within a particular genre.
