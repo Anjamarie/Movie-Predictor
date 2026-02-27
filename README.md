@@ -7,6 +7,18 @@ Crucially, this repository serves as a case study in robust data science deploym
 
 ### View the Live Application: (https://anjamarie-movie-predictor.hf.space/)
 
+```mermaid
+graph TD
+    A[User Input: Budget/Genre] --> B[Streamlit App]
+    B --> C{Model in Cache?}
+    C -- No --> D[Download .pkl from Hugging Face CDN]
+    D --> E[Save to Local Runtime]
+    E --> F[Load with Joblib]
+    C -- Yes --> F
+    F --> G[Run Gradient Boosting Regressor]
+    G --> H[Display Predicted Revenue]
+```
+
 ## Feature Engineering
 The model uses the following key features, derived from TMDb data, to make predictions:
 
